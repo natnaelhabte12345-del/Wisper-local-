@@ -1,0 +1,9 @@
+httpx
+sounddevice
+numpy
+scipy
+pyperclip
+keyboard
+pystray
+Pillow
+pywin32

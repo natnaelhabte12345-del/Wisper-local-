@@ -46,7 +46,7 @@ class Recorder:
         if self._auto_stop_timer:
             self._auto_stop_timer.cancel()
             self._auto_stop_timer = None
-        time.sleep(0.4)   # trailing buffer — captures end of sentence after key release
+        time.sleep(0.85)  # trailing buffer — captures end of sentence after key release
         self._active = False
         if self._stream:
             self._stream.stop()

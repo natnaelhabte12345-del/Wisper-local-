@@ -21,7 +21,7 @@ COMPUTE_TYPE = "int8"
 # Text formatting — send transcript through local qwen2.5:7b to clean up
 # repetitions and fix punctuation. Requires Ollama running locally.
 # Set to False to skip formatting and inject raw transcript immediately.
-FORMAT_TEXT = True
+FORMAT_TEXT = False
 
 # Hotkey: both Ctrl AND the Windows key must be held simultaneously
 # Hold to record, release to transcribe and inject.

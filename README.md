@@ -4,7 +4,7 @@ A local voice-dictation tool for Windows — hold a hotkey, speak, release, and 
 transcribed text is typed wherever your cursor is. Built as a free, open alternative
 to Wispr Flow.
 
-- Hold **Ctrl + Space** → speak → release → text appears
+- Hold **Right Ctrl** → speak → release → text appears
 - Works in any app (browser, editor, chat, terminal)
 - German + English, including code-switching mid-sentence
 - Transcription via Groq's `whisper-large-v3`, cleanup via `llama-3.3-70b-versatile`
@@ -13,7 +13,8 @@ to Wispr Flow.
 
 ## How it works
 
-1. `hotkey.py` polls for Ctrl+Space held simultaneously.
+1. `hotkey.py` polls for the Right Ctrl key being held. A bare modifier never
+   triggers app shortcuts and never leaks keystrokes into the focused window.
 2. On press: `recorder.py` starts capturing microphone audio (16kHz mono).
 3. On release: the audio is sent to Groq's Whisper API for transcription.
 4. The raw transcript is cleaned up by a Groq LLM call — punctuation,
@@ -45,7 +46,7 @@ Run it:
 run.bat
 ```
 
-Hold **Ctrl + Space**, speak, release.
+Hold **Right Ctrl**, speak, release.
 
 ## Autostart on boot
 

@@ -23,6 +23,7 @@ _FPS = 30
 _GWL_EXSTYLE = -20
 _WS_EX_NOACTIVATE = 0x08000000
 _WS_EX_TOOLWINDOW = 0x00000080
+_WS_EX_TRANSPARENT = 0x00000020   # click-through — overlay never intercepts input
 
 # Each bar gets its own speed + phase + amplitude so motion looks organic
 random.seed(42)
@@ -43,17 +44,15 @@ class RecordingOverlay:
         self._ready.wait(timeout=5)
 
     def show_listening(self):
+        # No deiconify — the window stays permanently mapped so it never
+        # steals focus. Only the drawn content changes (empty = transparent).
         self._state = "listening"
-        if self._root:
-            self._root.after(0, self._root.deiconify)
 
     def show_transcribing(self):
         self._state = "transcribing"
 
     def hide(self):
         self._state = "hidden"
-        if self._root:
-            self._root.after(0, self._root.withdraw)
 
     def _run(self):
         self._root = tk.Tk()
@@ -67,7 +66,6 @@ class RecordingOverlay:
         x = (sw - _W) // 2
         y = sh - _H - 70
         self._root.geometry(f"{_W}x{_H}+{x}+{y}")
-        self._root.withdraw()
 
         self._canvas = tk.Canvas(
             self._root, width=_W, height=_H,
@@ -85,7 +83,7 @@ class RecordingOverlay:
             hwnd = ctypes.windll.user32.GetParent(self._root.winfo_id()) or self._root.winfo_id()
             s = ctypes.windll.user32.GetWindowLongW(hwnd, _GWL_EXSTYLE)
             ctypes.windll.user32.SetWindowLongW(hwnd, _GWL_EXSTYLE,
-                s | _WS_EX_NOACTIVATE | _WS_EX_TOOLWINDOW)
+                s | _WS_EX_NOACTIVATE | _WS_EX_TOOLWINDOW | _WS_EX_TRANSPARENT)
         except Exception:
             pass
 

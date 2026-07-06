@@ -1,12 +1,13 @@
 """
 WisprWin — local Wispr Flow alternative for Windows.
 
-Hold Ctrl + Space  →  speak  →  release  →  text is typed where your cursor is.
+Hold Right Ctrl  →  speak  →  release  →  text is typed where your cursor is.
 Transcription and formatting run via the Groq API.
 """
 import sys
 import threading
 import ctypes
+import time
 
 from config import HOTKEY_POLL_MS, FORMAT_TEXT
 import hotkey
@@ -21,7 +22,8 @@ _recorder = rec_module.Recorder()
 _overlay = None
 _recording = False
 _busy = False
-_target_hwnd = None   # foreground window captured at hotkey press
+_target_hwnd = None
+_release_lock = threading.Lock()   # prevents double-fire from timer + manual release
 
 
 def _get_overlay():
@@ -46,22 +48,24 @@ def on_press():
 
 def on_release():
     global _recording, _busy
-    if not _recording:
-        return
-    _recording = False
-    _busy = True
-
-    # Run transcription in a thread so hotkey monitor stays responsive
+    with _release_lock:
+        if not _recording:
+            return
+        _recording = False
+        _busy = True
     threading.Thread(target=_process, daemon=True).start()
 
 
 def _process():
     global _busy
-    import time
     try:
         ov = _get_overlay()
         ov.show_transcribing()
         audio = _recorder.stop()
+
+        if audio.size < 16000 * 0.5:   # less than 0.5s — ignore
+            ov.hide()
+            return
 
         t0 = time.time()
         text = transcriber.transcribe(audio)
@@ -75,10 +79,13 @@ def _process():
         print(f"[timing] total:      {time.time()-t0:.2f}s  →  {text!r}")
         ov.hide()
         if text:
-            # Restore the window that had focus before we started recording
-            if _target_hwnd:
+            # Only restore focus if the target window is NOT already in front.
+            # The overlay uses WS_EX_NOACTIVATE and never steals focus, so in the
+            # normal case the target is still frontmost — and calling
+            # SetForegroundWindow anyway makes Chromium refocus its URL bar.
+            if _target_hwnd and ctypes.windll.user32.GetForegroundWindow() != _target_hwnd:
                 ctypes.windll.user32.SetForegroundWindow(_target_hwnd)
-            time.sleep(0.15)
+                time.sleep(0.15)
             injector.inject(text)
         time.sleep(0.3)
     finally:
@@ -87,7 +94,7 @@ def _process():
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 def main():
-    print("WisprWin started. Hold Ctrl + Win to dictate.")
+    print("WisprWin started. Hold RIGHT CTRL to dictate.")
 
     # Pre-initialize overlay so Tk window exists before first keypress
     _get_overlay()

@@ -10,6 +10,7 @@ import ctypes
 import time
 
 from config import HOTKEY_POLL_MS, FORMAT_TEXT
+import archive
 import hotkey
 import recorder as rec_module
 import transcriber
@@ -30,7 +31,8 @@ def _get_overlay():
     global _overlay
     if _overlay is None:
         from overlay import RecordingOverlay
-        _overlay = RecordingOverlay()
+        # The bars follow the real mic level, so the overlay needs to read it live.
+        _overlay = RecordingOverlay(level_source=_recorder.current_level)
     return _overlay
 
 
@@ -42,8 +44,10 @@ def on_press():
     # Capture which window the user was typing in before overlay appears
     _target_hwnd = ctypes.windll.user32.GetForegroundWindow()
     _recording = True
-    _get_overlay().show_listening()
+    # Open the mic BEFORE drawing the overlay — the Tk redraw costs enough
+    # milliseconds to clip the first syllable, which derails the whole sentence.
     _recorder.start(on_max_reached=on_release)
+    _get_overlay().show_listening()
 
 
 def on_release():
@@ -58,8 +62,8 @@ def on_release():
 
 def _process():
     global _busy
+    ov = _get_overlay()
     try:
-        ov = _get_overlay()
         ov.show_transcribing()
         audio = _recorder.stop()
 
@@ -67,16 +71,38 @@ def _process():
             ov.hide()
             return
 
+        print()
         t0 = time.time()
-        text = transcriber.transcribe(audio)
-        print(f"[timing] transcribe: {time.time()-t0:.2f}s")
+        raw = transcriber.transcribe(audio)
+        text = raw
+        t_stt = time.time() - t0
+        print(f"    Whisper   {t_stt:>6.2f}s")
 
+        t_fmt = 0.0
         if text and FORMAT_TEXT:
             t1 = time.time()
             text = formatter.format_text(text)
-            print(f"[timing] format:     {time.time()-t1:.2f}s")
+            t_fmt = time.time() - t1
+            print(f"    Formatter {t_fmt:>6.2f}s")
 
-        print(f"[timing] total:      {time.time()-t0:.2f}s  →  {text!r}")
+        if raw:
+            rms, dbfs, peak = transcriber.level(audio)
+            # Pegel mitspeichern, damit sich später zeigen lässt, ob ein
+            # schlechtes Transkript schlicht zu leise aufgenommen war.
+            archive.save(audio, raw, text, {
+                "dbfs": round(dbfs, 1), "peak": round(peak, 3),
+                "stt_s": round(t_stt, 2), "format_s": round(t_fmt, 2),
+            })
+
+        total = time.time() - t0
+        spoken = audio.size / 16000 / 60
+        wc = len(text.split())
+        print(f"    {'─' * 24}")
+        print(f"    Gesamt    {total:>6.2f}s   {wc} Wörter"
+              + (f" · {round(wc / spoken)} W/min" if spoken > 0.02 else ""))
+        if raw and raw != text:
+            print(f"    roh  › {raw}")
+        print(f"    text › {text}")
         ov.hide()
         if text:
             # Only restore focus if the target window is NOT already in front.
@@ -88,13 +114,27 @@ def _process():
                 time.sleep(0.15)
             injector.inject(text)
         time.sleep(0.3)
+    except Exception as e:
+        print(f"[process] error: {e}")
     finally:
+        ov.hide()   # always clear the overlay, even if transcription/injection failed
         _busy = False
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 def main():
-    print("WisprWin started. Hold RIGHT CTRL to dictate.")
+    archive.prune()
+    s = archive.stats()
+    rule = "─" * 58
+    print()
+    print(f"  WisprWin   ·   RIGHT CTRL halten zum Diktieren")
+    print(f"  {rule}")
+    print(f"  Heute       {s['words_today']:>7,} Wörter")
+    print(f"  Insgesamt   {s['words']:>7,} Wörter   in {s['minutes']:.0f} min   "
+          f"({s['wpm']} W/min)")
+    print(f"  Archiv      {s['clips']:>7} Clips    {s['mb']:.0f} MB   "
+          f"(Audio {archive.RETENTION_DAYS} Tage, Texte dauerhaft)")
+    print(f"  {rule}")
 
     # Pre-initialize overlay so Tk window exists before first keypress
     _get_overlay()

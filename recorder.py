@@ -17,6 +17,11 @@ class Recorder:
         self._stream = None
         self._auto_stop_timer = None
         self._on_max_reached = None
+        self._level = 0.0   # RMS of the most recent chunk, for the overlay
+
+    def current_level(self) -> float:
+        """RMS of the audio arriving right now. 0 when not recording."""
+        return self._level if self._active else 0.0
 
     def start(self, on_max_reached=None):
         self._on_max_reached = on_max_reached
@@ -59,5 +64,6 @@ class Recorder:
 
     def _callback(self, indata, frames, time_info, status):
         if self._active:
+            self._level = float(np.sqrt(np.mean(np.square(indata))))
             with self._lock:
                 self._chunks.append(indata.copy())

@@ -1,31 +1,20 @@
 # WisprWin — configuration
-# Flip LOOP_TRAINING_MODE = True to pause after each step and wait for approval.
-LOOP_TRAINING_MODE = False
 
-# ── Groq API (preferred — faster, higher quality) ─────────────────────────────
-# Key is loaded from .env — set USE_GROQ = False to force local Whisper instead.
-USE_GROQ = True
-GROQ_MODEL = "whisper-large-v3"   # $0.111/hr, better accuracy especially for German
+# ── Transcription ─────────────────────────────────────────────────────────────
+# Groq speech-to-text model. whisper-large-v3 is more accurate than -turbo,
+# noticeably so for German and for technical vocabulary.
+GROQ_MODEL = "whisper-large-v3"
 
-# ── Local Whisper fallback ────────────────────────────────────────────────────
-# faster-whisper model size: tiny, base, small, medium, large-v3
-MODEL_SIZE = "base"
+# ── Cleanup ───────────────────────────────────────────────────────────────────
+# Stage 2+3 of the pipeline: deterministic regex fixes for known Whisper
+# misspellings, then a Groq LLM call for punctuation, German noun
+# capitalization, dictated punctuation ("Doppelpunkt" -> ":") and fillers.
+#
+# True  — best text quality, roughly +0.5s per dictation, uses LLM tokens.
+# False — raw Whisper output, injected immediately, transcription tokens only.
+#         Whisper already punctuates reasonably, so this is a usable mode.
+FORMAT_TEXT = True
 
-# Language: None = auto-detect (German + English), or "de", "en"
-LANGUAGE = None
-
-# Device: "auto" picks CUDA if available, else CPU
-DEVICE = "auto"
-COMPUTE_TYPE = "int8"
-
-# Text formatting — send transcript through local qwen2.5:7b to clean up
-# repetitions and fix punctuation. Requires Ollama running locally.
-# Set to False to skip formatting and inject raw transcript immediately.
-FORMAT_TEXT = False
-
-# Hotkey: both Ctrl AND the Windows key must be held simultaneously
-# Hold to record, release to transcribe and inject.
-HOTKEY_POLL_MS = 50  # ms between hotkey state checks
-
-# UI
-OVERLAY_BOTTOM_MARGIN = 100  # px from bottom of screen
+# ── Hotkey ────────────────────────────────────────────────────────────────────
+# Hold RIGHT CTRL alone. See hotkey.py — left ctrl stays free for copy/paste.
+HOTKEY_POLL_MS = 50   # ms between hotkey state checks

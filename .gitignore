@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 .env
+
+# Local audio archive — your own voice and transcripts. Never publish.
+recordings/

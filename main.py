@@ -79,11 +79,14 @@ def _process():
         print(f"    Whisper   {t_stt:>6.2f}s")
 
         t_fmt = 0.0
-        if text and FORMAT_TEXT:
+        if text:
             t1 = time.time()
-            text = formatter.format_text(text)
+            # The regex layer runs either way — it is free and deterministic.
+            # FORMAT_TEXT only decides whether the LLM pass follows.
+            text = formatter.format_text(text) if FORMAT_TEXT \
+                else formatter.quick_fix(text)
             t_fmt = time.time() - t1
-            print(f"    Formatter {t_fmt:>6.2f}s")
+            print(f"    Formatter {t_fmt:>6.2f}s{'' if FORMAT_TEXT else '   (nur Regex)'}")
 
         if raw:
             rms, dbfs, peak = transcriber.level(audio)

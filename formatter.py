@@ -190,11 +190,20 @@ def _retry_after(resp) -> float:
         return 3.0
 
 
+def quick_fix(raw: str) -> str:
+    """Stage 2 alone: dedup + known-misspelling regex. No LLM, no network.
+
+    This is what runs with FORMAT_TEXT = False. It costs nothing and needs no
+    judgement, so there is no reason to skip it just because the LLM is off.
+    """
+    return _apply_fixes(_remove_consecutive_repeats(raw)) if raw.strip() else raw
+
+
 def format_text(raw: str) -> str:
     if not raw.strip():
         return raw
 
-    deduped = _apply_fixes(_remove_consecutive_repeats(raw))
+    deduped = quick_fix(raw)
 
     if not _KEY:
         return deduped

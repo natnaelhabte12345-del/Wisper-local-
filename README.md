@@ -104,10 +104,20 @@ Set `FORMAT_TEXT` in [`config.py`](config.py).
 | Text quality | best | good |
 | Latency | ~2.5 s | ~2.0 s |
 | API cost | transcription + LLM tokens | transcription only |
-| Dictated punctuation | yes | no |
+| Vocabulary fixes (`Superbase` → `Supabase`) | yes | **yes** — regex runs either way |
+| Repeated-phrase removal | yes | **yes** |
+| Dictated punctuation (`Doppelpunkt` → `:`) | yes | no |
 | German noun capitalization | yes | no |
 | Filler removal | yes | no |
-| Vocabulary fixes | regex **and** LLM | regex only |
+
+`FORMAT_TEXT` only controls the **LLM** pass. The regex layer is free,
+deterministic and needs no network, so it always runs — including the
+misspellings you add yourself.
+
+Dictated punctuation cannot work without the LLM: `Doppelpunkt` must become `:`
+in *"Ergebnis Doppelpunkt"* but stay a word in *"der Doppelpunkt gehört da nicht
+hin"*. That needs the sentence to be understood, which is not something a regex
+can do.
 
 **`False` is a real option, not a degraded fallback.** Whisper punctuates
 sentences on its own, and the regex layer still corrects known misspellings.

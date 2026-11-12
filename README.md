@@ -287,7 +287,11 @@ transcript, final text, level, timings, engine). Then you or an AI can:
 - build a benchmark from *your* voice and see which engine mishears *your* words,
 - find recurring mistakes (German homophones like *eher/mehr*, names, accent),
 - review how you speak (filler words, pace) with the unfiltered mode,
-- count how much and how long you dictate.
+- count how much and how long you dictate,
+- **improve WisprWin itself.** It is open source and far from perfect. Your own
+  recordings show exactly where it fails for *your* voice, language and
+  vocabulary, and an AI can turn that into fixes (better regex entries, prompt
+  changes, engine settings).
 
 Turn it on in `.env`:
 
@@ -312,6 +316,14 @@ If you turn it on: keep `recordings/` out of Git and cloud sync (it is in
 `.gitignore`), and choose the shortest retention that still serves your purpose.
 WisprWin never uploads the archive. The data leaves your machine only if *you*
 hand it to an AI or benchmark tool.
+
+---
+
+## Found something that is not good?
+
+Please tell me. Open an [issue](https://github.com/natnaelhabte12345-del/Wisper-local-/issues)
+with what you said, what appeared, and what you expected. Pull requests are welcome.
+Do not paste recordings or private text into a public issue.
 
 ---
 

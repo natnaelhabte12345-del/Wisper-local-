@@ -19,7 +19,7 @@ import numpy as np
 import scipy.io.wavfile as wav_io
 
 SAMPLE_RATE = 16000
-RETENTION_DAYS = 3
+RETENTION_DAYS = 30
 
 _ROOT = os.path.join(os.path.dirname(__file__), "recordings")
 

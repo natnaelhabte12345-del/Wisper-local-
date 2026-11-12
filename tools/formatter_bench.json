@@ -1,0 +1,48 @@
+{
+ "gpt-oss-120b": {
+  "similarity_to_llama": 0.959,
+  "median_s": 0.95,
+  "fails": "0/10",
+  "specials": [
+   {
+    "raw": "Sipabase, Grog, AI, 20%",
+    "out": "Supabase, Grog, AI, 20%.",
+    "end": "Supabase, Grog, AI, 20%.",
+    "err": "",
+    "s": 0.91
+   },
+   {
+    "raw": "uh so i just want to you know get like everything safe especially the you know my journal what i have actually done and also the focus steps i finished but you know the goal to drive ahead and what i ",
+    "out": "So I just want to, you know, get like everything safe, especially the, you know, my journal, what I have actually done, and also the focus steps I finished, but you know the goal to drive ahead and what I have worked on today, and you know, so if I have, like, if I would like to look back to this, to this week and see what have I actually done, to see okay I have done that, because like sometimes I would just look back and say okay I have done nothing, but why and where can I improve, right? It's just like giving myself and you as much as much data as possible to improve it, how to improve specific things, yeah, it was like over extra exaggerated something like that, you could just tell me, and I'm just yapping too much, but yeah, that's like my main golf drugs.",
+    "end": ", yeah, it was like over extra exaggerated something like that, you could just tell me, and I'm just yapping too much, but yeah, that's like my main golf drugs.",
+    "err": "",
+    "s": 1.85
+   }
+  ]
+ },
+ "gpt-oss-20b": {
+  "similarity_to_llama": 0.952,
+  "median_s": 2.63,
+  "fails": "1/10",
+  "specials": [
+   {
+    "raw": "Kannst du mir helfen, welche Taste bei Windows muss ich drücken, um meine alten kopierten Sachen zu sehen?",
+    "err": "guard fail 18->0"
+   },
+   {
+    "raw": "Sipabase, Grog, AI, 20%",
+    "out": "Supabase, Groq, AI, 20%.",
+    "end": "Supabase, Groq, AI, 20%.",
+    "err": "",
+    "s": 8.8
+   },
+   {
+    "raw": "uh so i just want to you know get like everything safe especially the you know my journal what i have actually done and also the focus steps i finished but you know the goal to drive ahead and what i ",
+    "out": "So I just want to you know get like everything safe especially the you know my journal what I have actually done and also the focus steps I finished but you know the goal to drive ahead and what I have worked on today and you know so if I have like if I would like to look back to this to this week and see what have I actually done to see okay I have done that because like sometimes I would just look back and say okay I have done nothing but why and where can I improve right. It's just like giving myself and you as much as possible to improve it how to improve specific things yeah it was like over extra exaggerated something like that you could just tell me and I'm just yapping too much but yeah that's like my main golf drugs.",
+    "end": "things yeah it was like over extra exaggerated something like that you could just tell me and I'm just yapping too much but yeah that's like my main golf drugs.",
+    "err": "",
+    "s": 7.83
+   }
+  ]
+ }
+}

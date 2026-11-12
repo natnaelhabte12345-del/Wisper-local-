@@ -73,6 +73,67 @@ def _release_modifiers() -> None:
     _send([_key_event(vk=vk, flags=_KEYEVENTF_KEYUP) for vk in _MODIFIER_VKS])
 
 
+_kernel32 = ctypes.windll.kernel32
+_CF_UNICODETEXT = 13
+_GMEM_MOVEABLE = 0x0002
+_PASTE_OVER = 1500   # typing this many characters in one burst garbles in real apps (measured)
+
+_user32.OpenClipboard.argtypes = (wintypes.HWND,)
+_user32.GetClipboardData.restype = wintypes.HANDLE
+_user32.GetClipboardData.argtypes = (wintypes.UINT,)
+_user32.SetClipboardData.argtypes = (wintypes.UINT, wintypes.HANDLE)
+_kernel32.GlobalAlloc.restype = wintypes.HANDLE
+_kernel32.GlobalAlloc.argtypes = (wintypes.UINT, ctypes.c_size_t)
+_kernel32.GlobalLock.restype = ctypes.c_void_p
+_kernel32.GlobalLock.argtypes = (wintypes.HANDLE,)
+_kernel32.GlobalUnlock.argtypes = (wintypes.HANDLE,)
+
+
+def _clipboard_get():
+    """Current clipboard text, or None if it holds something else / is busy."""
+    if not _user32.OpenClipboard(None):
+        return None
+    try:
+        h = _user32.GetClipboardData(_CF_UNICODETEXT)
+        if not h:
+            return None
+        p = _kernel32.GlobalLock(h)
+        try:
+            return ctypes.wstring_at(p)
+        finally:
+            _kernel32.GlobalUnlock(h)
+    finally:
+        _user32.CloseClipboard()
+
+
+def _clipboard_set(text: str) -> bool:
+    data = (text + "\0").encode("utf-16-le")
+    if not _user32.OpenClipboard(None):
+        return False
+    try:
+        _user32.EmptyClipboard()
+        h = _kernel32.GlobalAlloc(_GMEM_MOVEABLE, len(data))
+        p = _kernel32.GlobalLock(h)
+        ctypes.memmove(p, data, len(data))
+        _kernel32.GlobalUnlock(h)
+        return bool(_user32.SetClipboardData(_CF_UNICODETEXT, h))
+    finally:
+        _user32.CloseClipboard()
+
+
+def _paste(text: str) -> bool:
+    """Long text goes in with Ctrl+V; the previous clipboard text is put back afterwards."""
+    old = _clipboard_get()
+    if not _clipboard_set(text):
+        return False
+    _send([_key_event(vk=0x11), _key_event(vk=0x56),
+           _key_event(vk=0x56, flags=_KEYEVENTF_KEYUP), _key_event(vk=0x11, flags=_KEYEVENTF_KEYUP)])
+    time.sleep(0.6)   # let the target read the clipboard before it is replaced
+    if old is not None:
+        _clipboard_set(old)
+    return True
+
+
 def inject(text: str) -> None:
     text = text.replace("\n", " ").replace("\r", " ").strip()
     if not text:
@@ -80,6 +141,8 @@ def inject(text: str) -> None:
 
     _release_modifiers()
     time.sleep(0.02)
+    if len(text) > _PASTE_OVER and _paste(text):
+        return
 
     # Each char as a unicode key-down + key-up pair (UTF-16 code units,
     # so emoji/surrogate pairs work too). Sent in chunks so slow apps keep up.

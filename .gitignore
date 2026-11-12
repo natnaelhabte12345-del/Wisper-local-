@@ -5,3 +5,7 @@ __pycache__/
 
 # Local audio archive — your own voice and transcripts. Never publish.
 recordings/
+
+# Real dictation transcripts and logs — private
+tools/accuracy/real_set/
+wisprwin.log

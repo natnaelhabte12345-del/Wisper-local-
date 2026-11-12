@@ -5,6 +5,11 @@
 # noticeably so for German and for technical vocabulary.
 GROQ_MODEL = "whisper-large-v3"
 
+# Dictations at least this long (seconds of speech) go to AssemblyAI instead of Groq: ~2x fewer
+# errors on names/accents, ~5 s slower. Shorter ones stay on Groq (0.7 s). 0 = always Groq.
+# Measured on 60 test clips (tools/accuracy); 12 s is where Groq starts missing key words.
+ASSEMBLYAI_MIN_SECONDS = 12
+
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 # Stage 2+3 of the pipeline: deterministic regex fixes for known Whisper
 # misspellings, then a Groq LLM call for punctuation, German noun

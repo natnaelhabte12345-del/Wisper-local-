@@ -1,7 +1,7 @@
 """
 WisprWin — local Wispr Flow alternative for Windows.
 
-Hold Right Ctrl  →  speak  →  release  →  text is typed where your cursor is.
+Hold Right Ctrl (+ Right Shift for an unfiltered take with fillers and timestamps)  →  speak  →  release  →  text is typed where your cursor is.
 Transcription and formatting run via the Groq API.
 """
 import sys
@@ -17,6 +17,31 @@ import transcriber
 import formatter
 import injector
 import tray
+
+
+class _Tee:
+    """Console runs hidden, so everything printed also goes to wisprwin.log."""
+    def __init__(self, stream, f):
+        self.stream, self.f = stream, f
+
+    def write(self, data):
+        for out in (self.stream, self.f):
+            try:
+                out.write(data)
+                out.flush()
+            except Exception:
+                pass
+
+    def flush(self):
+        pass
+
+
+_log = open(__import__("os").path.join(__import__("os").path.dirname(__file__), "wisprwin.log"),
+            "a", encoding="utf-8")
+sys.stdout = _Tee(sys.stdout, _log)
+sys.stderr = _Tee(sys.stderr, _log)
+print()
+print(f"=== start {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
 
 # ── State ─────────────────────────────────────────────────────────────────────
 _recorder = rec_module.Recorder()
@@ -57,12 +82,14 @@ def on_release():
             return
         _recording = False
         _busy = True
+    hotkey.watch_shift = True
     threading.Thread(target=_process, daemon=True).start()
 
 
 def _process():
     global _busy
     ov = _get_overlay()
+    audio = None
     try:
         ov.show_transcribing()
         audio = _recorder.stop()
@@ -73,13 +100,14 @@ def _process():
 
         print()
         t0 = time.time()
-        raw = transcriber.transcribe(audio)
+        verbatim = hotkey.verbatim
+        raw = transcriber.transcribe_verbatim(audio) if verbatim else transcriber.transcribe(audio)
         text = raw
         t_stt = time.time() - t0
         print(f"    Whisper   {t_stt:>6.2f}s")
 
         t_fmt = 0.0
-        if text:
+        if text and not verbatim:   # verbatim stays untouched: fillers and timings are the point
             t1 = time.time()
             # The regex layer runs either way — it is free and deterministic.
             # FORMAT_TEXT only decides whether the LLM pass follows.
@@ -88,13 +116,20 @@ def _process():
             t_fmt = time.time() - t1
             print(f"    Formatter {t_fmt:>6.2f}s{'' if FORMAT_TEXT else '   (nur Regex)'}")
 
-        if raw:
+        hotkey.watch_shift = False
+        if hotkey.verbatim and not verbatim:   # Shift came after letting go of Ctrl
+            verbatim = True
+            raw = text = transcriber.transcribe_verbatim(audio)
+            print("    Shift danach gedrückt -> unveränderte Fassung")
+
+        if True:   # save even when transcription came back empty — never lose a take
             rms, dbfs, peak = transcriber.level(audio)
             # Pegel mitspeichern, damit sich später zeigen lässt, ob ein
             # schlechtes Transkript schlicht zu leise aufgenommen war.
             archive.save(audio, raw, text, {
                 "dbfs": round(dbfs, 1), "peak": round(peak, 3),
                 "stt_s": round(t_stt, 2), "format_s": round(t_fmt, 2),
+                "engine": transcriber.last_engine,
             })
 
         total = time.time() - t0
@@ -118,8 +153,12 @@ def _process():
             injector.inject(text)
         time.sleep(0.3)
     except Exception as e:
-        print(f"[process] error: {e}")
+        print(f"[process] error {time.strftime('%H:%M:%S')}: {e!r}")
+        if audio is not None and audio.size:
+            archive.save(audio, "", "", {"error": repr(e)})
+            print("    Audio trotzdem gespeichert in recordings/")
     finally:
+        hotkey.watch_shift = False
         ov.hide()   # always clear the overlay, even if transcription/injection failed
         _busy = False
 

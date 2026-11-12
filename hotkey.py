@@ -13,11 +13,18 @@ import threading
 import ctypes
 
 _VK_RCONTROL = 0xA3
+_VK_RSHIFT = 0xA1
+verbatim = False   # Right Shift added while Right Ctrl is held - or right after letting go
+watch_shift = False  # main.py keeps this on until it has the text, so a late Shift still counts
 _user32 = ctypes.windll.user32
 
 
 def _right_ctrl_pressed() -> bool:
     return bool(_user32.GetAsyncKeyState(_VK_RCONTROL) & 0x8000)
+
+
+def _right_shift_pressed() -> bool:
+    return bool(_user32.GetAsyncKeyState(_VK_RSHIFT) & 0x8000)
 
 
 def monitor(on_press, on_release, poll_ms: int = 50):
@@ -29,12 +36,17 @@ def monitor(on_press, on_release, poll_ms: int = 50):
 
 
 def _loop(on_press, on_release, poll_s: float):
+    global verbatim
     active = False
     while True:
         combo = _right_ctrl_pressed()
 
+        if (combo and active or watch_shift) and _right_shift_pressed():
+            verbatim = True
+
         if combo and not active:
             active = True
+            verbatim = False
             try:
                 on_press()
             except Exception as e:

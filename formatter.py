@@ -18,7 +18,14 @@ _FIXES = [
     (r"\bNxt\.?\s?js\b", "Next.js"),
     (r"\bNext\s?JS\b", "Next.js"),
     (r"\b([Dd])er Bild\b(?!-)", r"\1er Build"),   # "das Bild" stays untouched
-    (r"\bGrodd\b", "Groq"),                       # not a German word — safe to force
+    (r"\bGrog\b", "Groq"),                        # Whisper's usual mishearing; Grok (xAI) stays untouched
+    (r"\bSipa[- ]?base\b", "Supabase"),
+    (r"(?i)\bcloud[- ]?code\b", "Claude Code"),   # 27x in his archive; Claude is what he says
+    (r"(?i)\bstock[- ]?(?:fish|bush)\b", "Stockfish"),
+    (r"(?i)\bswap[- ]?flow\b", "Wispr Flow"),
+    # Whisper sometimes drops the "'t" ("I don have", "this isn working") — that flips the meaning.
+    (r"\b(isn|don|didn|doesn|wasn|couldn|wouldn|shouldn|aren|haven|hasn|weren)\b(?!['’])", r"\1't"),
+    (r"\bGrodd\b", "Groq"),                      # not a German word — safe to force
     # NOTE: "Auto" -> "Audio" does NOT belong here. "Auto" is a real German word,
     # so that one needs sentence context and stays the LLM's job.
 ]
@@ -63,19 +70,10 @@ Return the text with ONLY these five types of changes:
    also capitalize nouns and nominalized verbs/adjectives that the transcription
    left lowercase ("beim schnellen drüberlesen" -> "beim schnellen Drüberlesen",
    "als nächstes" -> "als Nächstes"). This is spelling, not rephrasing.
-3. VOCABULARY FIX — only if ALL THREE conditions are met:
-   a) the word sounds phonetically very close to a term in the list
-   b) the surrounding sentence context makes that term genuinely likely
-   c) you are at least 95% confident
-   Example: "super based" in a sentence about databases → "Supabase". But "super based" in any other context → leave it.
-   When in doubt, leave it exactly as spoken. It is always better to leave a wrong word than to replace a right one.
-
-   ONE EXCEPTION where you may act on context alone: the word is not a real
-   German or English word (a garbled fragment or stray letters like "SL",
-   "Grodd", "Nxt"), AND exactly one term from the list below fits the sentence.
-   Then replace it. A garbled fragment carries no meaning worth preserving.
-   This does NOT apply to real words — "Index.js", "Auto" and "Bild" are valid
-   and must be left alone even if another term seems more likely.
+3. VOCABULARY FIX — replace a misheard word with a term from the KNOWN VOCABULARY or the
+   PERSONAL GLOSSARY when it sounds nearly identical AND the sentence only makes sense with
+   the glossary term (e.g. "tournament pop-up" -> "terminal pop-up", "tools to cloud" ->
+   "tools to Claude"). If the heard word makes sense in its own sentence, leave it exactly as spoken.
 
 4. FILLERS — remove ONLY these two things:
    a) hesitation sounds: "ähm", "öhm", "äh", "uh", "um", "hm"
@@ -118,6 +116,21 @@ API, UI, UX, IDE, CLI, SDK, GPU, CPU,
 Claude Code, Subagent, Sonnet, Opus, Haiku, Prompt, Token, Benchmark, Regex,
 Wispr Flow, WisprWin
 
+PERSONAL GLOSSARY — words this speaker says often, and what the transcriber usually makes of them:
+  Claude / Claude Code / Claude Desktop / Claude Cowork   heard as: cloud, clod, claud, co work
+  Stockfish (chess engine)      heard as: stock fish, stop fishing, StockBush
+  Jarvis (his dashboard)        heard as: java, jar is, driver, service
+  terminal                      heard as: tournament
+  Opera / Opera GX (browser)    heard as: paras, of paras
+  Supabase                      heard as: superbase, sipabase
+  Groq (the API, spelled with a Q) and Grok (the xAI model) are BOTH real words he uses:
+    never turn one into the other unless it is a clear misspelling like "grog".
+  Wispr Flow                    heard as: swapflow, wisp flow, whisper flow
+Apply the glossary ONLY when the sentence makes the glossary word clearly the intended one
+(an AI tool, a chess game, a pop-up, startup apps...). If the heard word fits its own
+sentence ("the cloud storage", "learn Java", "the opera singer", "a chess tournament",
+"the airport terminal"), it is correct — leave it exactly as it is.
+
 CONTEXT: the user is usually dictating a message to an AI assistant. The output
 must stay recognisably THEIRS — their wording, their hedges, their train of
 thought. You are a typist fixing spelling and punctuation, not an editor
@@ -129,8 +142,8 @@ STRICT RULES:
 - NEVER complete a cut-off word. If the input ends mid-word ("gebro...",
   "Deployme"), leave the fragment exactly as it is. The recording was cut
   short; inventing the ending puts words in the speaker's mouth.
-- NEVER swap one real word for another real word that merely fits better.
-  An odd but real word is the speaker's; a smoother one would be yours.
+- Swap a real word for another one ONLY under rule 3. Otherwise an odd but real
+  word is the speaker's; a smoother one would be yours.
 - NEVER explain, justify or comment on your changes. No "this should be",
   no alternatives, no notes. Only the corrected text itself, on one line.
 - Do NOT shorten, tighten, merge or "clean up" sentences
@@ -210,7 +223,11 @@ def format_text(raw: str) -> str:
 
     try:
         resp = _post_with_retry({
-            "model": "llama-3.3-70b-versatile",
+            # llama-3.3-70b was removed by Groq (404). gpt-oss-120b won the
+            # bench in tools/formatter_bench.py: closest to Llama's old output, ~1s.
+            "model": "openai/gpt-oss-120b",
+            "reasoning_effort": "low",
+            "include_reasoning": False,
             "messages": [
                 {"role": "system", "content": _SYSTEM},
                 {"role": "user", "content": f"<t>{deduped}</t>"},
@@ -220,10 +237,11 @@ def format_text(raw: str) -> str:
             # used or not. A fixed 4000 cost 5381 tokens per dictation and
             # exhausted the 100k/day allowance after ~18 uses. Scale it to the
             # input instead: the output is a punctuated copy, never much longer.
-            "max_tokens": _output_budget(deduped),
+            # +600: gpt-oss spends a few hundred tokens thinking before it answers.
+            "max_tokens": _output_budget(deduped) + 600,
         })
         resp.raise_for_status()
-        result = resp.json()["choices"][0]["message"]["content"].strip()
+        result = (resp.json()["choices"][0]["message"]["content"] or "").strip()
         # Strip any <t>...</t> tags the model echoed back
         result = _apply_fixes(re.sub(r"</?t>", "", result).strip())
         in_wc = len(deduped.split())

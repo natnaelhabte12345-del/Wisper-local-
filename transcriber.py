@@ -4,12 +4,13 @@ No local fallback — keeps the pipeline simple and avoids the bad 'base' model.
 """
 import io
 import os
+import time
 
 import httpx
 import numpy as np
 import scipy.io.wavfile as wav_io
 
-from config import GROQ_MODEL
+from config import GROQ_MODEL, ASSEMBLYAI_MIN_SECONDS
 
 # ── Load API key from .env ─────────────────────────────────────────────────────
 def _load_env():
@@ -26,6 +27,15 @@ def _load_env():
 
 _load_env()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+ASSEMBLYAI_KEY = os.environ.get("ASSEMBLYAI_API_KEY", "")
+last_engine = "groq"   # which engine produced the latest transcript (saved with each clip)
+
+# Names the recogniser keeps getting wrong. AssemblyAI takes up to 1000 such terms.
+_GLOSSARY = ["Claude", "Claude Code", "Claude Desktop", "Claude Cowork", "Jarvis", "Stockfish",
+             "Supabase", "Groq", "Grok", "Whisper", "Wispr Flow", "WisprWin", "Opus", "Sonnet",
+             "Haiku", "Vercel", "Next.js", "PowerShell", "ADB", "MCP", "Telegram", "Speechmatics",
+             "Opera", "Opera GX", "Brave", "Spotify", "Discord", "OneDrive", "Playwright",
+             "Firecrawl", "Hyperframes"]
 
 # Groq caps this at 896 characters — keep only terms Whisper struggles with.
 # Common words (Python, Docker, API, React) are already in Whisper's vocab.
@@ -127,7 +137,79 @@ def transcribe(audio: np.ndarray) -> str:
     if _is_silence(audio):
         print("    ! zu leise — übersprungen")
         return ""
-    wav_bytes = _to_wav_bytes(_trim_silence(audio))
+    trimmed = _trim_silence(audio)
+    text = None
+    global last_engine
+    last_engine = "groq"
+    if ASSEMBLYAI_KEY and ASSEMBLYAI_MIN_SECONDS and trimmed.size / 16000 >= ASSEMBLYAI_MIN_SECONDS:
+        try:
+            text = _assemblyai(trimmed)
+            last_engine = "assemblyai"
+        except Exception as e:
+            print(f"    ! AssemblyAI fehlgeschlagen ({str(e)[:60]}) — Groq als Ersatz")
+    if text is None:
+        text = _groq(trimmed)
+    if text.lower().strip(" .,!?…") in _HALLUCINATIONS:
+        print("    ! bekannte Halluzination bei Stille — verworfen")
+        return ""
+    return text
+
+
+def _assemblyai(audio: np.ndarray, verbatim: bool = False):
+    """Longer dictations: ~2x fewer errors than Whisper, mostly on names and accents,
+    but ~5 s slower (tools/accuracy). The glossary is what fixes Claude/Stockfish/Jarvis.
+    verbatim=True keeps "uh/um" and returns (text, words-with-timings) instead of text."""
+    h = {"authorization": ASSEMBLYAI_KEY}
+    up = httpx.post("https://api.assemblyai.com/v2/upload", headers=h,
+                    content=_to_wav_bytes(audio), timeout=30)
+    up.raise_for_status()
+    body = {"audio_url": up.json()["upload_url"],
+            "speech_models": ["universal-3-5-pro", "universal-2"],
+            "keyterms_prompt": _GLOSSARY}
+    if verbatim:
+        body["disfluencies"] = True
+    job = httpx.post("https://api.assemblyai.com/v2/transcript", headers=h, timeout=30, json=body)
+    job.raise_for_status()
+    url = f"https://api.assemblyai.com/v2/transcript/{job.json()['id']}"
+    deadline = time.time() + 45
+    while time.time() < deadline:
+        s = httpx.get(url, headers=h, timeout=30).json()
+        if s["status"] == "completed":
+            text = (s.get("text") or "").strip()
+            return (text, s.get("words") or []) if verbatim else text
+        if s["status"] == "error":
+            raise RuntimeError(s.get("error", "unknown"))
+        time.sleep(0.4)
+    raise TimeoutError("keine Antwort in 45 s")
+
+
+def _stamp(ms: int) -> str:
+    return f"{ms // 60000}:{ms // 1000 % 60:02d}.{ms // 100 % 10}"
+
+
+def transcribe_verbatim(audio: np.ndarray) -> str:
+    """Unfiltered take for analysing one's own speech: keeps fillers, timestamps every
+    word (m:ss.d) and notes pauses of 3 s or more. Single line - a newline would press
+    Enter in a chat box. Whisper (Groq) drops fillers, so there is no equal fallback."""
+    global last_engine
+    last_engine = "assemblyai-verbatim"
+    if audio.size == 0 or not ASSEMBLYAI_KEY or _is_silence(audio):
+        return ""
+    text, words = _assemblyai(audio, verbatim=True)
+    if not words:
+        return text
+    out, prev_end = [], 0
+    for i, w in enumerate(words):
+        gap = w["start"] - prev_end
+        if i and gap >= 3000:
+            out.append(f"(Pause {round(gap / 1000)} s)")
+        out.append(f"[{_stamp(w['start'])}] {w['text']}")
+        prev_end = w["end"]
+    return " ".join(out)
+
+
+def _groq(audio: np.ndarray) -> str:
+    wav_bytes = _to_wav_bytes(audio)
     resp = httpx.post(
         "https://api.groq.com/openai/v1/audio/transcriptions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
@@ -145,11 +227,7 @@ def transcribe(audio: np.ndarray) -> str:
     if not resp.is_success:
         print(f"[Groq] {resp.status_code} error: {resp.text}")
         resp.raise_for_status()
-    text = resp.json().get("text", "").strip()
-    if text.lower().strip(" .,!?…") in _HALLUCINATIONS:
-        print("    ! bekannte Halluzination bei Stille — verworfen")
-        return ""
-    return text
+    return resp.json().get("text", "").strip()
 
 
 def _get_model():

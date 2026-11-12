@@ -175,7 +175,7 @@ def main():
     print(f"  Insgesamt   {s['words']:>7,} Wörter   in {s['minutes']:.0f} min   "
           f"({s['wpm']} W/min)")
     print(f"  Archiv      {s['clips']:>7} Clips    {s['mb']:.0f} MB   "
-          f"(Audio {archive.RETENTION_DAYS} Tage, Texte dauerhaft)")
+          f"({'Audio ' + str(archive.RETENTION_DAYS) + ' Tage, Texte dauerhaft' if archive.ENABLED else 'AUS - nichts wird gespeichert'})")
     print(f"  {rule}")
 
     # Pre-initialize overlay so Tk window exists before first keypress

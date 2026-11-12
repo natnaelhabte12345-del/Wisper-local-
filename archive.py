@@ -19,7 +19,29 @@ import numpy as np
 import scipy.io.wavfile as wav_io
 
 SAMPLE_RATE = 16000
-RETENTION_DAYS = 30
+
+
+def _env_days() -> int:
+    """WISPRWIN_KEEP_AUDIO_DAYS from the environment or .env. 0 / unset = archive OFF."""
+    val = os.environ.get("WISPRWIN_KEEP_AUDIO_DAYS")
+    if val is None:
+        try:
+            with open(os.path.join(os.path.dirname(__file__), ".env"), encoding="utf-8") as f:
+                for line in f:
+                    k, _, v = line.strip().partition("=")
+                    if k.strip() == "WISPRWIN_KEEP_AUDIO_DAYS":
+                        val = v.strip()
+        except OSError:
+            pass
+    try:
+        return max(0, int(val or 0))
+    except ValueError:
+        return 0
+
+
+# 0 = nothing is stored (default, privacy-safe). N > 0 = keep audio + transcripts, audio for N days.
+RETENTION_DAYS = _env_days()
+ENABLED = RETENTION_DAYS > 0
 
 _ROOT = os.path.join(os.path.dirname(__file__), "recordings")
 
@@ -30,7 +52,7 @@ def _day_dir(when: _dt.datetime) -> str:
 
 def save(audio: np.ndarray, raw: str, formatted: str, meta: dict | None = None) -> str | None:
     """Store one dictation. Returns the clip path, or None if nothing was saved."""
-    if audio.size == 0:
+    if not ENABLED or audio.size == 0:
         return None
     try:
         now = _dt.datetime.now()
@@ -71,7 +93,7 @@ def prune() -> int:
 
     Returns the number of .wav files deleted.
     """
-    if not os.path.isdir(_ROOT):
+    if not ENABLED or not os.path.isdir(_ROOT):
         return 0
     cutoff = _dt.date.today() - _dt.timedelta(days=RETENTION_DAYS - 1)
     deleted = 0
@@ -111,7 +133,7 @@ def stats() -> dict:
     words = 0
     today = _dt.date.today().isoformat()
     words_today = 0
-    for folder, _, files in os.walk(_ROOT):
+    for folder, _, files in os.walk(_ROOT):   # empty if the archive was never used
         for name in files:
             path = os.path.join(folder, name)
             total_bytes += os.path.getsize(path)

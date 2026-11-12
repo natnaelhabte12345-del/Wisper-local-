@@ -9,6 +9,15 @@ browser, editor, chat, terminal. German, English, or both in the same sentence.
 
 A free, open alternative to Wispr Flow.
 
+> **Installing this with an AI assistant?** Point it at [`AGENTS.md`](AGENTS.md).
+> It lists the choices to put to you (privacy, accuracy, cost) so nothing is
+> switched on without you knowing.
+
+| Hotkey | What happens |
+|---|---|
+| **Right Ctrl** (hold) | Normal dictation: cleaned-up text is typed at your cursor. |
+| **Right Ctrl + Right Shift** | *Unfiltered* take: every word stamped with its time (`[0:03.4] so`), `um`/`uh` kept, nothing cleaned. Good for reviewing how you really speak. Needs an AssemblyAI key. Shift can be pressed while holding, or up to ~2 s after letting go. |
+
 ---
 
 ## Why another dictation tool
@@ -34,9 +43,10 @@ Right Ctrl held
 Right Ctrl released  (+0.85 s trailing buffer so word endings survive)
    │
    ├─ 3  transcriber.py  silence check → trim dead air → Groq whisper-large-v3
+   │                     (speech ≥ 12 s → AssemblyAI instead, if you set its key)
    ├─ 4  formatter.py    regex fixes → Groq llama-3.3-70b → regex again
-   ├─ 5  archive.py      audio + both texts stored locally
-   └─ 6  injector.py     Win32 SendInput, character by character
+   ├─ 5  archive.py      OPTIONAL, off by default: audio + texts stored locally
+   └─ 6  injector.py     Win32 SendInput; texts over 1,500 characters are pasted
 ```
 
 ### Stage 3 — transcription
@@ -84,14 +94,36 @@ and a word-count guard discards any response that grew or shrank too much.
 Dictated punctuation is supported: say *"Doppelpunkt"* and you get `:`, while
 *"der Doppelpunkt gehört da nicht hin"* keeps the word.
 
+### Stage 3b — which engine
+
+Speech under 12 s goes to Groq (about 0.7 s). Longer speech goes to
+AssemblyAI (about 5 s slower) **if** `ASSEMBLYAI_API_KEY` is set; on any failure
+it falls back to Groq. Without the key everything stays on Groq. Threshold:
+`ASSEMBLYAI_MIN_SECONDS` in [`config.py`](config.py). In a test on 60 clips,
+Groq started missing key words from about 12 s on.
+
 ### Stage 6 — injection
 
 Win32 `SendInput` with `KEYEVENTF_UNICODE`, one character at a time.
+Texts over 1,500 characters are put on the clipboard and pasted with Ctrl+V
+instead, then your previous clipboard text is restored: typing ~10,000
+characters in one burst garbled the output in real apps (measured).
 
 Not `keyboard.write()`. That library tracks modifier state internally, and a
 stuck Ctrl turned a typed `l` into Ctrl+L — which is why text used to land in
 the browser address bar. Unicode events carry no virtual key code and cannot be
 interpreted as a shortcut.
+
+---
+
+## The overlay
+
+While you hold the key, a small dark pill shows a live "thermal" waveform: each
+bar glows from cold blue (quiet) through red and orange to white-hot (loud).
+The lower edge is a level meter. It is warm orange at a good level, cold blue
+when you are too quiet, white-hot when you clip. On release it cools to grey
+while the text is transcribed, then fades out. It is drawn as a per-pixel-alpha
+window (anti-aliased, soft shadow), see [`overlay.py`](overlay.py).
 
 ---
 
@@ -181,6 +213,9 @@ Copy `.env.example` to `.env` and add your key:
 GROQ_API_KEY=gsk_...
 ```
 
+Everything else in `.env.example` is optional: `ASSEMBLYAI_API_KEY` (better
+long dictations) and `WISPRWIN_KEEP_AUDIO_DAYS` (local archive, see above).
+
 Run:
 
 ```bash
@@ -234,22 +269,49 @@ Do **not** add words to a Whisper prompt. That path was measured and it hurts.
 |---|---|
 | `tools/mic_check.py` | Measures your microphone: level in dBFS, signal-to-noise ratio, clipping. Says plainly whether the mic is a problem. |
 | `tools/stt_bench.py` | Compares STT providers on your own voice, scored by word error rate. |
+| `tools/accuracy/` | Engine comparison on test clips and, if you use the archive, on your own recordings (`real_bench.py`; `make_rating_page.py` builds a page to judge disagreements by ear). |
 | `tests/bench_text.md` | The 60-second reference text, dense with the vocabulary that usually fails. |
 | `tests/dictation-tests.md` | Six graded test texts, each probing a different failure mode. |
 
 ---
 
-## Your recordings stay local
+## Optional: keep your recordings and learn from them
 
-Every dictation is written to `recordings/<date>/`, audio plus a JSON file with
-the raw transcript, the final text, level and timings. Nothing is uploaded
-beyond the transcription request itself, and `recordings/` is in `.gitignore`.
+**Off by default. Out of the box WisprWin stores nothing.** Your voice goes to
+the transcription provider and nowhere else.
 
-Audio is deleted after 3 days. The JSON files stay — they are small, and they
-are what a benchmark needs.
+You can switch on a local archive. It exists for one purpose: **learning about
+your own speech.** Every dictation is saved as audio plus a JSON file (raw
+transcript, final text, level, timings, engine). Then you or an AI can:
 
-To turn the archive off, remove the `archive.save(...)` call in
-[`main.py`](main.py).
+- build a benchmark from *your* voice and see which engine mishears *your* words,
+- find recurring mistakes (German homophones like *eher/mehr*, names, accent),
+- review how you speak (filler words, pace) with the unfiltered mode,
+- count how much and how long you dictate.
+
+Turn it on in `.env`:
+
+```
+WISPRWIN_KEEP_AUDIO_DAYS=30
+```
+
+The number is how many days the **audio** is kept. Transcript JSON files are tiny
+and stay. `0` or unset means nothing is stored.
+
+**Why this is not for everybody:**
+
+- Recordings of your voice are personal data, and often include other people,
+  passwords or client names you said out loud. A plain folder on disk is not
+  protected from anyone with access to your PC, a backup, or a synced cloud folder.
+- Audio is large (about 2 MB per minute), so 30 days of heavy use is gigabytes.
+- It only pays off if you actually *use* the data. If you just want to dictate,
+  leave it off.
+- Shared or work machines: usually a bad idea, check your employer's rules.
+
+If you turn it on: keep `recordings/` out of Git and cloud sync (it is in
+`.gitignore`), and choose the shortest retention that still serves your purpose.
+WisprWin never uploads the archive. The data leaves your machine only if *you*
+hand it to an AI or benchmark tool.
 
 ---
 

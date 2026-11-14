@@ -212,6 +212,29 @@ def _pitch(seg: np.ndarray):
     return round(float(np.median(f0))), ("↗" if st > 2 else "↘" if st < -2 else "")
 
 
+def _praat_track(audio: np.ndarray):
+    """Pitch track from Praat (the reference tool): 10 ms steps, Hz, 0 = unvoiced.
+    ~0.07 s per 2 minutes of audio. None if parselmouth is not installed."""
+    try:
+        import parselmouth
+        snd = parselmouth.Sound(audio.astype("float64"), sampling_frequency=16000)
+        p = snd.to_pitch_ac(time_step=0.01, pitch_floor=70, pitch_ceiling=400, voicing_threshold=0.45)
+        return p.selected_array["frequency"]
+    except Exception:
+        return None
+
+
+def _pitch_from_track(track, start_ms: int, end_ms: int):
+    """Same output as _pitch, but read from the Praat track for one word."""
+    fr = track[int(start_ms / 10):int(end_ms / 10)]
+    fr = fr[fr > 0]
+    if len(fr) < 3:
+        return None, ""
+    k = max(1, len(fr) // 3)
+    st = 12 * np.log2(np.median(fr[-k:]) / np.median(fr[:k]))
+    return round(float(np.median(fr))), ("↗" if st > 2 else "↘" if st < -2 else "")
+
+
 def transcribe_verbatim(audio: np.ndarray) -> str:
     """Unfiltered take for analysing one's own speech: keeps fillers, timestamps every
     word (m:ss.d) and notes pauses of 3 s or more. Single line - a newline would press
@@ -229,7 +252,9 @@ def transcribe_verbatim(audio: np.ndarray) -> str:
         seg = audio[int(w["start"] * 16):int(w["end"] * 16)]
         return level(seg)[1] if seg.size else -99.0
     dbs = [_db(w) for w in words]
-    pit = [_pitch(audio[int(w["start"] * 16):int(w["end"] * 16)]) for w in words]
+    track = _praat_track(audio)
+    pit = [_pitch_from_track(track, w["start"], w["end"]) if track is not None
+           else _pitch(audio[int(w["start"] * 16):int(w["end"] * 16)]) for w in words]
     out = [f"(Je Wort: Zeit, Lautstärke in dBFS (0 = Maximum, Ø {round(float(np.median(dbs)))} dB), "
            f"Tonhöhe in Hz (↗ steigend, ↘ fallend; fehlt bei stimmlosen/zu kurzen Wörtern))"]
     prev_end = 0

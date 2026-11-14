@@ -5,3 +5,4 @@ scipy
 pystray
 Pillow
 pywin32
+praat-parselmouth

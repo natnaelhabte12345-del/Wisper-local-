@@ -63,8 +63,9 @@ and pauses of 3 s or more are marked:
 - **Pitch** is the median fundamental frequency of the word in Hz. `↗` means the pitch
   rises by more than ~2 semitones within the word (typical for questions), `↘` means it
   falls (typical for the end of a statement). Whispered, very short or unvoiced words
-  (*s*, *f*) have no pitch and show none. Pitch is estimated from your audio, so
-  treat it as a hint, not a measurement.
+  (*s*, *f*) have no pitch and show none. Pitch comes from [Praat](https://www.fon.hum.uva.nl/praat/) (via `praat-parselmouth`,
+  the standard tool in speech research, ~0.1 s per take). Without it a simpler built-in
+  estimator is used, which is less exact. Treat the values as a hint, not a measurement.
 - Texts over 1,500 characters are pasted automatically (no manual Ctrl+V).
 
 Paste the result into an AI chat and ask, for example: *"Where do I hesitate, which

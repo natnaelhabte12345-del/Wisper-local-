@@ -187,6 +187,31 @@ def _stamp(ms: int) -> str:
     return f"{ms // 60000}:{ms // 1000 % 60:02d}.{ms // 100 % 10}"
 
 
+def _pitch(seg: np.ndarray):
+    """(median Hz, trend) of the voiced part of one word, or (None, "") if it has none.
+    Autocorrelation per 40 ms frame (70-400 Hz). trend is "↗"/"↘" when the pitch moves by
+    more than ~2 semitones between the first and last third (rising = question, falling = end)."""
+    sr, n, hop = 16000, 640, 160
+    lo, hi = sr // 400, sr // 70
+    f0 = []
+    for i in range(0, len(seg) - n, hop):
+        fr = seg[i:i + n] - np.mean(seg[i:i + n])
+        if np.sqrt(np.mean(fr ** 2)) < 0.004:
+            continue
+        ac = np.correlate(fr, fr, "full")[n - 1:]
+        if ac[0] <= 0:
+            continue
+        lag = lo + int(np.argmax(ac[lo:hi]))
+        if ac[lag] / ac[0] > 0.4:
+            f0.append(sr / lag)
+    if len(f0) < 3:
+        return None, ""
+    k = max(1, len(f0) // 3)
+    a, b = float(np.median(f0[:k])), float(np.median(f0[-k:]))
+    st = 12 * np.log2(b / a)
+    return round(float(np.median(f0))), ("↗" if st > 2 else "↘" if st < -2 else "")
+
+
 def transcribe_verbatim(audio: np.ndarray) -> str:
     """Unfiltered take for analysing one's own speech: keeps fillers, timestamps every
     word (m:ss.d) and notes pauses of 3 s or more. Single line - a newline would press
@@ -204,13 +229,16 @@ def transcribe_verbatim(audio: np.ndarray) -> str:
         seg = audio[int(w["start"] * 16):int(w["end"] * 16)]
         return level(seg)[1] if seg.size else -99.0
     dbs = [_db(w) for w in words]
-    out = [f"(Lautstärke je Wort in dBFS, 0 = Maximum, Ø {round(float(np.median(dbs)))} dB)"]
+    pit = [_pitch(audio[int(w["start"] * 16):int(w["end"] * 16)]) for w in words]
+    out = [f"(Je Wort: Zeit, Lautstärke in dBFS (0 = Maximum, Ø {round(float(np.median(dbs)))} dB), "
+           f"Tonhöhe in Hz (↗ steigend, ↘ fallend; fehlt bei stimmlosen/zu kurzen Wörtern))"]
     prev_end = 0
     for i, w in enumerate(words):
         gap = w["start"] - prev_end
         if i and gap >= 3000:
             out.append(f"(Pause {round(gap / 1000)} s)")
-        out.append(f"[{_stamp(w['start'])} {round(dbs[i])}dB] {w['text']}")
+        hz, tr = pit[i]
+        out.append(f"[{_stamp(w['start'])} {round(dbs[i])}dB{f' {hz}Hz{tr}' if hz else ''}] {w['text']}")
         prev_end = w["end"]
     return " ".join(out)
 

@@ -23,7 +23,7 @@ It is useful in three ways:
    speak about 3x faster than you type. Technical words and mixed German/English
    come out right (*Supabase*, not "Superbase").
 2. **Understand how you really speak.** The *unfiltered* mode (below) keeps every
-   "um" and "uh", stamps every word with its time and its **volume**, and marks
+   "um" and "uh", stamps every word with its time, **volume** and **pitch**, and marks
    long pauses. Hand that text to an AI and it can see your rhythm, hesitations,
    filler words, where you got quiet or emphasised something. Good for language
    learning (English as a second language), speech or interview practice,
@@ -47,18 +47,24 @@ Windows; expect rough edges and please report them.
 
 ### The unfiltered take
 
-Nothing is cleaned up. Every word gets a time stamp and a volume, `um`/`uh` stay in,
+Nothing is cleaned up. Every word gets a time stamp, a volume and a pitch, `um`/`uh` stay in,
 and pauses of 3 s or more are marked:
 
 ```
-(Lautstärke je Wort in dBFS, 0 = Maximum, Ø -31 dB) [0:00.0 -28dB] So [0:00.4 -24dB] I
-[0:00.6 -33dB] think [0:00.9 -38dB] um [0:01.3 -22dB] actually (Pause 4 s) [0:06.1 -30dB] yes
+(Je Wort: Zeit, Lautstärke in dBFS (0 = Maximum, Ø -31 dB), Tonhöhe in Hz (↗ steigend, ↘ fallend; ...))
+[0:00.0 -28dB 118Hz] So [0:00.4 -24dB 124Hz] I [0:00.6 -33dB 110Hz↘] think
+[0:00.9 -38dB] um [0:01.3 -22dB 131Hz↗] actually? (Pause 4 s) [0:06.1 -30dB 112Hz↘] yes
 ```
 
 - **Time** is `minutes:seconds.tenths` from the start of the take.
 - **Volume** is the level of just that word in dBFS: 0 is the maximum, so `-22dB` is
   louder than `-38dB`. The first line gives the median of the take. Compare words
   *within one take*; absolute values depend on your microphone.
+- **Pitch** is the median fundamental frequency of the word in Hz. `↗` means the pitch
+  rises by more than ~2 semitones within the word (typical for questions), `↘` means it
+  falls (typical for the end of a statement). Whispered, very short or unvoiced words
+  (*s*, *f*) have no pitch and show none. Pitch is estimated from your audio, so
+  treat it as a hint, not a measurement.
 - Texts over 1,500 characters are pasted automatically (no manual Ctrl+V).
 
 Paste the result into an AI chat and ask, for example: *"Where do I hesitate, which

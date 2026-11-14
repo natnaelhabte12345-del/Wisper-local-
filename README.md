@@ -9,6 +9,33 @@ browser, editor, chat, terminal. German, English, or both in the same sentence.
 
 A free, open alternative to Wispr Flow.
 
+---
+
+## What is this, and what is it for?
+
+WisprWin turns your voice into typed text, in any app, with one hotkey. It runs
+on your own PC and only sends the audio to a speech-to-text service
+(Groq, optionally AssemblyAI) to be transcribed. You need your own API key.
+
+It is useful in three ways:
+
+1. **Talk instead of type.** Messages, emails, prompts for an AI, notes. You
+   speak about 3x faster than you type. Technical words and mixed German/English
+   come out right (*Supabase*, not "Superbase").
+2. **Understand how you really speak.** The *unfiltered* mode (below) keeps every
+   "um" and "uh", stamps every word with its time and its **volume**, and marks
+   long pauses. Hand that text to an AI and it can see your rhythm, hesitations,
+   filler words, where you got quiet or emphasised something. Good for language
+   learning (English as a second language), speech or interview practice,
+   presentations, or checking how clearly you come across.
+3. **Learn from your own recordings and improve the tool.** An optional local
+   archive keeps your recordings so you can measure which engine understands
+   *you* best and fix what fails. See
+   [Optional: keep your recordings](#optional-keep-your-recordings-and-learn-from-them).
+
+It is a personal tool, not a polished product. It works well for its author on
+Windows; expect rough edges and please report them.
+
 > **Installing this with an AI assistant?** Point it at [`AGENTS.md`](AGENTS.md).
 > It lists the choices to put to you (privacy, accuracy, cost) so nothing is
 > switched on without you knowing.
@@ -16,7 +43,27 @@ A free, open alternative to Wispr Flow.
 | Hotkey | What happens |
 |---|---|
 | **Right Ctrl** (hold) | Normal dictation: cleaned-up text is typed at your cursor. |
-| **Right Ctrl + Right Shift** | *Unfiltered* take: every word stamped with its time (`[0:03.4] so`), `um`/`uh` kept, nothing cleaned. Good for reviewing how you really speak. Needs an AssemblyAI key. Shift can be pressed while holding, or up to ~2 s after letting go. |
+| **Right Ctrl + Right Shift** | *Unfiltered* take (see below). Needs an AssemblyAI key. Shift can be pressed while holding, or up to ~2 s after letting go. |
+
+### The unfiltered take
+
+Nothing is cleaned up. Every word gets a time stamp and a volume, `um`/`uh` stay in,
+and pauses of 3 s or more are marked:
+
+```
+(Lautstärke je Wort in dBFS, 0 = Maximum, Ø -31 dB) [0:00.0 -28dB] So [0:00.4 -24dB] I
+[0:00.6 -33dB] think [0:00.9 -38dB] um [0:01.3 -22dB] actually (Pause 4 s) [0:06.1 -30dB] yes
+```
+
+- **Time** is `minutes:seconds.tenths` from the start of the take.
+- **Volume** is the level of just that word in dBFS: 0 is the maximum, so `-22dB` is
+  louder than `-38dB`. The first line gives the median of the take. Compare words
+  *within one take*; absolute values depend on your microphone.
+- Texts over 1,500 characters are pasted automatically (no manual Ctrl+V).
+
+Paste the result into an AI chat and ask, for example: *"Where do I hesitate, which
+filler words do I use most, where do I trail off quietly, how would a native speaker
+phrase this?"*
 
 ---
 
@@ -287,7 +334,7 @@ transcript, final text, level, timings, engine). Then you or an AI can:
 - build a benchmark from *your* voice and see which engine mishears *your* words,
 - find recurring mistakes (German homophones like *eher/mehr*, names, accent),
 - review how you speak (filler words, pace) with the unfiltered mode,
-- count how much and how long you dictate,
+- count how much and how long you dictate (each entry stores the length of the take),
 - **improve WisprWin itself.** It is open source and far from perfect. Your own
   recordings show exactly where it fails for *your* voice, language and
   vocabulary, and an AI can turn that into fixes (better regex entries, prompt

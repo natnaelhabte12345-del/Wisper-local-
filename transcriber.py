@@ -198,12 +198,19 @@ def transcribe_verbatim(audio: np.ndarray) -> str:
     text, words = _assemblyai(audio, verbatim=True)
     if not words:
         return text
-    out, prev_end = [], 0
+    # Volume per word: RMS of exactly that word's samples (16 kHz -> 16 samples/ms), in dBFS.
+    # 0 = full scale; closer to 0 = louder. Compare words within one take, not across mics.
+    def _db(w):
+        seg = audio[int(w["start"] * 16):int(w["end"] * 16)]
+        return level(seg)[1] if seg.size else -99.0
+    dbs = [_db(w) for w in words]
+    out = [f"(Lautstärke je Wort in dBFS, 0 = Maximum, Ø {round(float(np.median(dbs)))} dB)"]
+    prev_end = 0
     for i, w in enumerate(words):
         gap = w["start"] - prev_end
         if i and gap >= 3000:
             out.append(f"(Pause {round(gap / 1000)} s)")
-        out.append(f"[{_stamp(w['start'])}] {w['text']}")
+        out.append(f"[{_stamp(w['start'])} {round(dbs[i])}dB] {w['text']}")
         prev_end = w["end"]
     return " ".join(out)
 

@@ -212,6 +212,17 @@ def _pitch(seg: np.ndarray):
     return round(float(np.median(f0))), ("↗" if st > 2 else "↘" if st < -2 else "")
 
 
+def _bright(seg: np.ndarray):
+    """Brightness of a word: spectral centroid (Hz) between 100 Hz and 5 kHz. Higher = brighter
+    voice (smiling/laughing raises it). Rough proxy for timbre; only meaningful for voiced words."""
+    if len(seg) < 1280:   # under 80 ms: too little signal
+        return None
+    spec = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
+    f = np.fft.rfftfreq(len(seg), 1 / 16000)
+    m = (f >= 100) & (f <= 5000)
+    return round(float(np.sum(f[m] * spec[m]) / np.sum(spec[m]))) if np.sum(spec[m]) > 0 else None
+
+
 def _praat_track(audio: np.ndarray):
     """Pitch track from Praat (the reference tool): 10 ms steps, Hz, 0 = unvoiced.
     ~0.07 s per 2 minutes of audio. None if parselmouth is not installed."""
@@ -256,14 +267,17 @@ def transcribe_verbatim(audio: np.ndarray) -> str:
     pit = [_pitch_from_track(track, w["start"], w["end"]) if track is not None
            else _pitch(audio[int(w["start"] * 16):int(w["end"] * 16)]) for w in words]
     out = [f"(Je Wort: Zeit, Lautstärke in dBFS (0 = Maximum, Ø {round(float(np.median(dbs)))} dB), "
-           f"Tonhöhe in Hz (↗ steigend, ↘ fallend; fehlt bei stimmlosen/zu kurzen Wörtern))"]
+           f"Tonhöhe in Hz (↗ steigend, ↘ fallend; fehlt bei stimmlosen/zu kurzen Wörtern), "
+           f"B = Helligkeit der Stimme in Hz, höher = heller/z.B. lächelnd)"]
     prev_end = 0
     for i, w in enumerate(words):
         gap = w["start"] - prev_end
         if i and gap >= 3000:
             out.append(f"(Pause {round(gap / 1000)} s)")
         hz, tr = pit[i]
-        out.append(f"[{_stamp(w['start'])} {round(dbs[i])}dB{f' {hz}Hz{tr}' if hz else ''}] {w['text']}")
+        br = _bright(audio[int(w["start"] * 16):int(w["end"] * 16)]) if hz else None
+        out.append(f"[{_stamp(w['start'])} {round(dbs[i])}dB{f' {hz}Hz{tr}' if hz else ''}"
+                   f"{f' B{br}' if br else ''}] {w['text']}")
         prev_end = w["end"]
     return " ".join(out)
 

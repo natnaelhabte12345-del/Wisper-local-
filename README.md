@@ -23,7 +23,7 @@ It is useful in three ways:
    speak about 3x faster than you type. Technical words and mixed German/English
    come out right (*Supabase*, not "Superbase").
 2. **Understand how you really speak.** The *unfiltered* mode (below) keeps every
-   "um" and "uh", stamps every word with its time, **volume** and **pitch**, and marks
+   "um" and "uh", stamps every word with its time, **volume**, **pitch** and **brightness**, and marks
    long pauses. Hand that text to an AI and it can see your rhythm, hesitations,
    filler words, where you got quiet or emphasised something. Good for language
    learning (English as a second language), speech or interview practice,
@@ -47,7 +47,7 @@ Windows; expect rough edges and please report them.
 
 ### The unfiltered take
 
-Nothing is cleaned up. Every word gets a time stamp, a volume and a pitch, `um`/`uh` stay in,
+Nothing is cleaned up. Every word gets a time stamp, a volume, a pitch and a brightness value, `um`/`uh` stay in,
 and pauses of 3 s or more are marked:
 
 ```
@@ -66,6 +66,10 @@ and pauses of 3 s or more are marked:
   (*s*, *f*) have no pitch and show none. Pitch comes from [Praat](https://www.fon.hum.uva.nl/praat/) (via `praat-parselmouth`,
   the standard tool in speech research, ~0.1 s per take). Without it a simpler built-in
   estimator is used, which is less exact. Treat the values as a hint, not a measurement.
+- **Brightness** (`B650`) is the spectral centroid of the word in Hz: how much of the
+  sound sits in higher frequencies. A smiling or laughing voice is brighter than a flat
+  one. Only shown for voiced words. It is a rough proxy for timbre: compare takes of
+  *your own voice* with the *same microphone*; the number is not an emotion detector.
 - Texts over 1,500 characters are pasted automatically (no manual Ctrl+V).
 
 Paste the result into an AI chat and ask, for example: *"Where do I hesitate, which

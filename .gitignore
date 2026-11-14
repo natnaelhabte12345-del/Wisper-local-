@@ -9,3 +9,4 @@ recordings/
 # Real dictation transcripts and logs — private
 tools/accuracy/real_set/
 wisprwin.log
+*.before_*.py

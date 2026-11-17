@@ -70,6 +70,9 @@ and pauses of 3 s or more are marked:
   sound sits in higher frequencies. A smiling or laughing voice is brighter than a flat
   one. Only shown for voiced words. It is a rough proxy for timbre: compare takes of
   *your own voice* with the *same microphone*; the number is not an emotion detector.
+- **Held words** (`~0.5s`) mark a word held unusually long (prolongation or block, as in
+  stuttering). Pauses from 1 s are marked. **Repeated sounds** ("t-t-to") are *not*
+  visible: the speech engine merges them into one word.
 - Texts over 1,500 characters are pasted automatically (no manual Ctrl+V).
 
 Paste the result into an AI chat and ask, for example: *"Where do I hesitate, which

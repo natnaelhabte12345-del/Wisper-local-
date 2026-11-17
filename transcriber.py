@@ -223,6 +223,26 @@ def _bright(seg: np.ndarray):
     return round(float(np.sum(f[m] * spec[m]) / np.sum(spec[m]))) if np.sum(spec[m]) > 0 else None
 
 
+def _held_end(words, i, track) -> int:
+    """End of word i in ms. The engine often gives a held sound ("Iiiii") a tiny span and leaves
+    the rest as a gap; if that gap is still voiced (Praat pitch present), the word was held."""
+    end = words[i]["end"]
+    if track is not None and i + 1 < len(words):
+        nxt = words[i + 1]["start"]
+        gap = track[int(end / 10):int(nxt / 10)]
+        if 150 <= nxt - end <= 2000 and len(gap) and np.mean(gap > 0) >= 0.6:
+            return nxt
+    return end
+
+
+def _long(w, end=None) -> str:
+    """Flag a word that was held unusually long (prolongation / block, typical for stuttering).
+    Repeated sounds ("t-t-to") are NOT visible: the engine merges them into one word."""
+    letters = sum(c.isalpha() for c in w["text"])
+    dur = (end or w["end"]) - w["start"]
+    return f" ~{dur / 1000:.1f}s" if letters and dur > 300 + 80 * letters else ""
+
+
 def _praat_track(audio: np.ndarray):
     """Pitch track from Praat (the reference tool): 10 ms steps, Hz, 0 = unvoiced.
     ~0.07 s per 2 minutes of audio. None if parselmouth is not installed."""
@@ -268,16 +288,17 @@ def transcribe_verbatim(audio: np.ndarray) -> str:
            else _pitch(audio[int(w["start"] * 16):int(w["end"] * 16)]) for w in words]
     out = [f"(Je Wort: Zeit, Lautstärke in dBFS (0 = Maximum, Ø {round(float(np.median(dbs)))} dB), "
            f"Tonhöhe in Hz (↗ steigend, ↘ fallend; fehlt bei stimmlosen/zu kurzen Wörtern), "
+           f"~0.5s = Wort auffallend lang gehalten (Dehnung/Block), Pause ab 1 s markiert; Wiederholungen wie t-t-to sind NICHT sichtbar, "
            f"B = Helligkeit der Stimme in Hz, höher = heller/z.B. lächelnd)"]
     prev_end = 0
     for i, w in enumerate(words):
         gap = w["start"] - prev_end
-        if i and gap >= 3000:
+        if i and gap >= 1000:
             out.append(f"(Pause {round(gap / 1000)} s)")
         hz, tr = pit[i]
         br = _bright(audio[int(w["start"] * 16):int(w["end"] * 16)]) if hz else None
         out.append(f"[{_stamp(w['start'])} {round(dbs[i])}dB{f' {hz}Hz{tr}' if hz else ''}"
-                   f"{f' B{br}' if br else ''}] {w['text']}")
+                   f"{f' B{br}' if br else ''}{_long(w, _held_end(words, i, track))}] {w['text']}")
         prev_end = w["end"]
     return " ".join(out)
 

@@ -11,6 +11,7 @@ import time
 
 from config import HOTKEY_POLL_MS, FORMAT_TEXT
 import archive
+import wheel
 import hotkey
 import recorder as rec_module
 import transcriber
@@ -186,6 +187,7 @@ def main():
 
     # Start hotkey monitor
     hotkey.monitor(on_press, on_release, poll_ms=HOTKEY_POLL_MS)
+    wheel.start()   # mouse wheel keeps scrolling while Right Ctrl is held
 
     # Block main thread on tray icon (blocks until Quit)
     tray.run_tray(on_quit=lambda: sys.exit(0))

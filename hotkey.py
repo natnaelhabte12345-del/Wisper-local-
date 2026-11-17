@@ -16,10 +16,13 @@ _VK_RCONTROL = 0xA3
 _VK_RSHIFT = 0xA1
 verbatim = False   # Right Shift added while Right Ctrl is held - or right after letting go
 watch_shift = False  # main.py keeps this on until it has the text, so a late Shift still counts
+ignore_until = 0.0   # wheel.py blinks Ctrl for a moment; until then Right Ctrl counts as held
 _user32 = ctypes.windll.user32
 
 
 def _right_ctrl_pressed() -> bool:
+    if time.time() < ignore_until:
+        return True
     return bool(_user32.GetAsyncKeyState(_VK_RCONTROL) & 0x8000)
 
 

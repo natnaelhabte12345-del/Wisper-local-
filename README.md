@@ -177,6 +177,16 @@ interpreted as a shortcut.
 
 ---
 
+## Scrolling while you hold the key
+
+Holding Right Ctrl normally turns the mouse wheel into "zoom" (browsers) or nothing, so
+scrolling seems frozen while you dictate. [`wheel.py`](wheel.py) installs a low-level
+mouse hook that, during recording, re-sends wheel events with Ctrl briefly released, so
+the wheel scrolls normally. Left Ctrl + wheel (zoom) is untouched. Other keys held
+together with Right Ctrl still act as Ctrl shortcuts (that cannot be hidden safely).
+
+---
+
 ## The overlay
 
 While you hold the key, a small dark pill shows a live "thermal" waveform: each

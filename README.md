@@ -177,6 +177,15 @@ interpreted as a shortcut.
 
 ---
 
+## Throw a take away (Delete)
+
+Said something badly? Press **Delete** at any time from pressing Right Ctrl until the
+text appears: nothing is typed and nothing is archived. [`cancel.py`](cancel.py) swallows
+that Delete (low-level keyboard hook) so it does not also delete a character in your
+text box. Outside a dictation, Delete works as usual.
+
+---
+
 ## Scrolling while you hold the key
 
 Holding Right Ctrl normally turns the mouse wheel into "zoom" (browsers) or nothing, so

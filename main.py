@@ -12,6 +12,7 @@ import time
 from config import HOTKEY_POLL_MS, FORMAT_TEXT
 import archive
 import wheel
+import cancel
 import hotkey
 import recorder as rec_module
 import transcriber
@@ -69,6 +70,7 @@ def on_press():
         return
     # Capture which window the user was typing in before overlay appears
     _target_hwnd = ctypes.windll.user32.GetForegroundWindow()
+    cancel.requested = False
     _recording = True
     # Open the mic BEFORE drawing the overlay — the Tk redraw costs enough
     # milliseconds to clip the first syllable, which derails the whole sentence.
@@ -95,6 +97,9 @@ def _process():
         ov.show_transcribing()
         audio = _recorder.stop()
 
+        if cancel.requested:
+            print("    Abgebrochen (Entf) - nichts getippt, nichts gespeichert")
+            return
         if audio.size < 16000 * 0.5:   # less than 0.5s — ignore
             ov.hide()
             return
@@ -117,6 +122,10 @@ def _process():
             t_fmt = time.time() - t1
             print(f"    Formatter {t_fmt:>6.2f}s{'' if FORMAT_TEXT else '   (nur Regex)'}")
 
+        if cancel.requested:
+            hotkey.watch_shift = False
+            print("    Abgebrochen (Entf) - nichts getippt, nichts gespeichert")
+            return
         hotkey.watch_shift = False
         if hotkey.verbatim and not verbatim:   # Shift came after letting go of Ctrl
             verbatim = True
@@ -143,7 +152,7 @@ def _process():
             print(f"    roh  › {raw}")
         print(f"    text › {text}")
         ov.hide()
-        if text:
+        if text and not cancel.requested:
             # Only restore focus if the target window is NOT already in front.
             # The overlay uses WS_EX_NOACTIVATE and never steals focus, so in the
             # normal case the target is still frontmost — and calling
@@ -188,6 +197,8 @@ def main():
     # Start hotkey monitor
     hotkey.monitor(on_press, on_release, poll_ms=HOTKEY_POLL_MS)
     wheel.start()   # mouse wheel keeps scrolling while Right Ctrl is held
+    cancel.armed = lambda: _recording or _busy
+    cancel.start()  # Delete = throw this dictation away
 
     # Block main thread on tray icon (blocks until Quit)
     tray.run_tray(on_quit=lambda: sys.exit(0))
